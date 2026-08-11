@@ -2438,10 +2438,13 @@
         sigma=(z+1.5_dl*dgq/k2)/EV%Kf(1)
         ayprime(ix_etak)=0.5_dl*dgq + State%curv*z
     end if
-
+    
+    ! DHFS NOTE: 
+    ! CAMBLateDE has this commented out.
+    ! This time we want perturbations.
     if (.not. EV%is_cosmological_constant) &
         call State%CP%DarkEnergy%PerturbationEvolve(ayprime, w_dark_energy_t, &
-        EV%w_ix, a, adotoa, k, z, ay)
+        EV%w_ix, a, adotoa, k, z, ay)  
 
     !  CDM equation of motion
     clxcdot=-k*z
@@ -2923,11 +2926,17 @@
             end if
             if (associated(EV%CustomSources)) then
                 select type(DE=>State%CP%DarkEnergy)
-                class is (TDarkEnergyEqnOfState)
-                    cs2_de = DE%cs2_lam
+                !VM BEGINS
+                !class is (TDarkEnergyEqnOfState)
+                !
+                !    cs2_de = DE%cs2_lam
+                !class default
+                !    cs2_de=1
+                !end select
                 class default
-                    cs2_de=1
+                    cs2_de = DE%cs2_lam
                 end select
+                !VM ENDS
                 block
                     procedure(TSource_func), pointer :: custom_sources_func
 

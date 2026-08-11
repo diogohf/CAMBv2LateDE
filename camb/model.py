@@ -23,7 +23,10 @@ from .baseconfig import (
     numpy_1d,
     numpy_1d_int,
 )
-from .dark_energy import DarkEnergyEqnOfState, DarkEnergyModel
+#DHFS BEGINS
+# from .dark_energy import DarkEnergyEqnOfState, DarkEnergyModel
+from .dark_energy import DarkEnergyModel
+#DHFS ENDS
 from .initialpower import InitialPower, SplinedInitialPower
 from .nonlinear import NonLinearModel
 from .recombination import RecombinationModel

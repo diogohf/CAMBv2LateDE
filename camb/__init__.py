@@ -46,7 +46,10 @@ from .camb import (
     set_params_cosmomc,
     write_ini,
 )
-from .dark_energy import DarkEnergyFluid, DarkEnergyPPF
+#DHFS BEGINS
+# from .dark_energy import DarkEnergyFluid, DarkEnergyPPF
+from .dark_energy import DarkEnergyPPF
+#DHFS ENDS
 from .initialpower import InitialPowerLaw, SplinedInitialPower
 from .mathutils import threej
 from .model import CAMBparams, TransferParams

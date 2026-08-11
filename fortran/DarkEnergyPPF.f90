@@ -1,11 +1,17 @@
     module DarkEnergyPPF
     use DarkEnergyInterface
     use classes
+    !DHFS: BEGINS
+    use LateDE
+    !DHFS: ENDS
     implicit none
 
     private
 
-    type, extends(TDarkEnergyEqnOfState) :: TDarkEnergyPPF
+    !DHFS: BEGINS
+    ! type, extends(TDarkEnergyEqnOfState) :: TDarkEnergyPPF !Standard CAMB 
+    type, extends(TLateDE) :: TDarkEnergyPPF !CAMB modified
+    !DHFS: ENDS
         real(dl) :: c_Gamma_ppf = 0.4_dl
     contains
     procedure :: ReadParams => TDarkEnergyPPF_ReadParams
@@ -21,15 +27,17 @@
     contains
 
     subroutine TDarkEnergyPPF_ReadParams(this, Ini)
-    use IniObjects
-    class(TDarkEnergyPPF) :: this
-    class(TIniFile), intent(in) :: Ini
+        use IniObjects
+        class(TDarkEnergyPPF) :: this
+        class(TIniFile), intent(in) :: Ini
 
-    call this%TDarkEnergyEqnOfState%ReadParams(Ini)
-    this%cs2_lam = Ini%Read_Double('cs2_lam', 1.d0)
-    if (this%cs2_lam /= 1._dl) error stop 'cs2_lam not supported by PPF model'
-    call this%setcgammappf
-
+        !DHFS: BEGINS
+        ! call this%TDarkEnergyEqnOfState%ReadParams(Ini)
+        call this%TLateDE%ReadParams(Ini)
+        !DHFS: ENDS
+        this%cs2_lam = Ini%Read_Double('cs2_lam', 1.d0)
+        if (this%cs2_lam /= 1._dl) error stop 'cs2_lam not supported by PPF model'
+        call this%setcgammappf
     end subroutine TDarkEnergyPPF_ReadParams
 
     function TDarkEnergyPPF_PythonClass()
@@ -55,8 +63,11 @@
     use config
     class(TDarkEnergyPPF), intent(inout) :: this
     class(TCAMBdata), intent(in), target :: State
-
-    call this%TDarkEnergyEqnOfState%Init(State)
+    
+    !DHFS: BEGINS
+    ! call this%TDarkEnergyEqnOfState%Init(State)
+    call this%TLateDE%Init(State)
+    !DHFS: ENDS
     if (this%is_cosmological_constant) then
         this%num_perturb_equations = 0
     else

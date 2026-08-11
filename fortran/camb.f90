@@ -9,7 +9,11 @@
     use Reionization
     use Recombination, only : TRecFast
     use lensing
-    use DarkEnergyFluid
+    !VM BEGINS
+    !use DarkEnergyFluid
+    use DarkEnergyPPF
+    ! use LateDE
+    !VM ENDS
     implicit none
 
     type TCAMBThetaH0Solver
@@ -251,7 +255,10 @@
     P%lens_output_margin = 200
 
     allocate(THalofit::P%NonLinearModel)
-    allocate(TDarkEnergyFluid::P%DarkEnergy)
+    !VM BEGINS
+    !allocate(TDarkEnergyFluid::P%DarkEnergy)
+    allocate(TDarkEnergyPPF::P%DarkEnergy)
+    !VM ENDS
     allocate(TInitialPowerLaw::P%InitPower)
     allocate(TRecfast::P%Recomb)
     allocate(TTanhReionization::P%Reion)
@@ -368,9 +375,14 @@
     logical function CAMB_ReadParams(P, Ini, ErrMsg)
     use NonLinear
     use SPkNonLinear, only: TSPkNonLinear
-    use DarkEnergyFluid
+    !VM BEGINS
+    !use DarkEnergyFluid
+    !VM ENDS
     use DarkEnergyPPF
-    use Quintessence
+    !VM BEGINS
+    !use Quintessence
+    use constants
+    !VM ENDS
     use results
 #ifdef COSMOREC
     use CosmoRec
@@ -552,21 +564,27 @@
         end if
     endif
 
+    !DHFS BEGINS
     !  Read initial parameters.
-    DarkEneryModel = UpperCase(Ini%Read_String_Default('dark_energy_model', 'fluid'))
+    ! DarkEneryModel = UpperCase(Ini%Read_String_Default('dark_energy_model', 'fluid'))
+    DarkEneryModel = UpperCase(Ini%Read_String_Default('dark_energy_model', 'ppf'))
     if (allocated(P%DarkEnergy)) deallocate(P%DarkEnergy)
-    if (DarkEneryModel == 'FLUID') then
-        allocate (TDarkEnergyFluid::P%DarkEnergy)
-    else if (DarkEneryModel == 'PPF') then
+    
+    if (DarkEneryModel == 'PPF') then
         allocate (TDarkEnergyPPF::P%DarkEnergy)
-    else if (DarkEneryModel == 'AXIONEFFECTIVEFLUID') then
-        allocate (TAxionEffectiveFluid::P%DarkEnergy)
-    else if (DarkEneryModel == 'EARLYQUINTESSENCE') then
-        allocate (TEarlyQuintessence::P%DarkEnergy)
+        ! if (DarkEneryModel == 'FLUID') then
+        !     allocate (TDarkEnergyFluid::P%DarkEnergy)
+        ! else if (DarkEneryModel == 'PPF') then
+        !     allocate (TDarkEnergyPPF::P%DarkEnergy)
+        ! else if (DarkEneryModel == 'AXIONEFFECTIVEFLUID') then
+        !     allocate (TAxionEffectiveFluid::P%DarkEnergy)
+        ! else if (DarkEneryModel == 'EARLYQUINTESSENCE') then
+        !     allocate (TEarlyQuintessence::P%DarkEnergy)
     else
         ErrMsg = 'Unknown dark energy model: '//trim(DarkEneryModel)
         return
     end if
+    !DHFS ENDS
     call P%DarkEnergy%ReadParams(Ini)
 
     RecombinationModel = UpperCase(Ini%Read_String_Default('recombination_model', 'Recfast'))

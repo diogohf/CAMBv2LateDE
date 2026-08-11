@@ -4,7 +4,10 @@
     use Precision
     use results
     use iso_c_binding
-    use DarkEnergyFluid
+    !VM BEGINS
+    !use DarkEnergyFluid
+    use LateDE
+    !VM ENDS
     use DarkEnergyPPF
     use HypersphericalBesselOlver, only: phi_olver
     use ObjectLists

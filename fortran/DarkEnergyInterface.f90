@@ -1,6 +1,6 @@
     module DarkEnergyInterface
     use precision
-    use interpolation
+    use Interpolation
     use classes
     implicit none
 
@@ -18,7 +18,7 @@
     contains
     procedure :: Init
     procedure :: BackgroundDensityAndPressure
-    procedure :: PerturbedStressEnergy !Get density perturbation and heat flux for sources
+    procedure :: PerturbedStressEnergy ! Get density perturbation and heat flux for sources
     procedure :: diff_rhopi_Add_Term
     procedure :: PerturbationInitial
     procedure :: PerturbationEvolve
@@ -26,7 +26,8 @@
     ! do not have to implement w_de or grho_de if BackgroundDensityAndPressure is inherited directly
     procedure :: w_de => TDarkEnergyModel_w_de
     procedure :: grho_de => TDarkEnergyModel_grho_de
-    procedure :: Effective_w_wa !Used as approximate values for non-linear corrections
+    procedure :: Effective_w_wa ! Used as approximate values for non-linear corrections
+    procedure :: assume_scale_indep_lowz_growth => TDarkEnergyModel_assume_scale_indep_lowz_growth
     end type TDarkEnergyModel
 
     public TDarkEnergyModel
@@ -35,18 +36,18 @@
     function TDarkEnergyModel_w_de(this, a)
     class(TDarkEnergyModel) :: this
     real(dl) :: TDarkEnergyModel_w_de, al
-    real(dl), intent(IN) :: a
+    real(dl), intent(in) :: a
 
     TDarkEnergyModel_w_de = -1._dl
 
-    end function TDarkEnergyModel_w_de  ! equation of state of the PPF DE
+    end function TDarkEnergyModel_w_de ! equation of state of the PPF DE
 
-    function TDarkEnergyModel_grho_de(this, a)  !relative density (8 pi G a^4 rho_de /grhov)
+    function TDarkEnergyModel_grho_de(this, a) ! relative density (8 pi G a^4 rho_de /grhov)
     class(TDarkEnergyModel) :: this
     real(dl) :: TDarkEnergyModel_grho_de, al, fint
-    real(dl), intent(IN) :: a
+    real(dl), intent(in) :: a
 
-    TDarkEnergyModel_grho_de =0._dl
+    TDarkEnergyModel_grho_de = 0._dl
 
     end function TDarkEnergyModel_grho_de
 
@@ -56,7 +57,6 @@
 
     end subroutine PrintFeedback
 
-
     subroutine Init(this, State)
     use classes
     class(TDarkEnergyModel), intent(inout) :: this
@@ -65,19 +65,19 @@
     end subroutine Init
 
     subroutine BackgroundDensityAndPressure(this, grhov, a, grhov_t, w)
-    !Get grhov_t = 8*pi*rho_de*a**2 and (optionally) equation of state at scale factor a
+    ! Get grhov_t = 8*pi*rho_de*a**2 and (optionally) equation of state at scale factor a
     class(TDarkEnergyModel), intent(inout) :: this
     real(dl), intent(in) :: grhov, a
     real(dl), intent(out) :: grhov_t
-    real(dl), optional, intent(out) :: w
+    real(dl), intent(out), optional :: w
 
     if (this%is_cosmological_constant) then
-        grhov_t = grhov * a * a
+        grhov_t = grhov*a*a
         if (present(w)) w = -1_dl
     else
         ! Ensure a valid result
         if (a > 1e-10) then
-            grhov_t = grhov * this%grho_de(a) / (a * a)
+            grhov_t = grhov*this%grho_de(a)/(a*a)
         else
             grhov_t = 0._dl
         end if
@@ -95,23 +95,35 @@
 
     end subroutine Effective_w_wa
 
+    function TDarkEnergyModel_assume_scale_indep_lowz_growth(this)
+    ! Whether growth of matter perturbations at the low redshifts relevant for late-time structure
+    ! can be assumed scale-independent (as for LCDM), e.g. because dark energy does not cluster
+    ! significantly on the scales of interest. Used by non-linear models (e.g. HMcode) to decide
+    ! whether quantities computed from the shape of the z=0 spectrum can be re-used, rescaled by the
+    ! growth factor, at other redshifts, rather than being recomputed at each redshift.
+    ! Conservatively false by default; override in specific dark energy implementations.
+    class(TDarkEnergyModel) :: this
+    logical :: TDarkEnergyModel_assume_scale_indep_lowz_growth
+
+    TDarkEnergyModel_assume_scale_indep_lowz_growth = .false.
+
+    end function TDarkEnergyModel_assume_scale_indep_lowz_growth
 
     subroutine PerturbedStressEnergy(this, dgrhoe, dgqe, &
         a, dgq, dgrho, grho, grhov_t, w, gpres_noDE, etak, adotoa, k, kf1, ay, ayprime, w_ix)
     class(TDarkEnergyModel), intent(inout) :: this
     real(dl), intent(out) :: dgrhoe, dgqe
-    real(dl), intent(in) ::  a, dgq, dgrho, grho, grhov_t, w, gpres_noDE, etak, adotoa, k, kf1
+    real(dl), intent(in) :: a, dgq, dgrho, grho, grhov_t, w, gpres_noDE, etak, adotoa, k, kf1
     real(dl), intent(in) :: ay(*)
     real(dl), intent(inout) :: ayprime(*)
     integer, intent(in) :: w_ix
 
-    dgrhoe=0
-    dgqe=0
+    dgrhoe = 0
+    dgqe = 0
 
     end subroutine PerturbedStressEnergy
 
-
-    function diff_rhopi_Add_Term(this, dgrhoe, dgqe,grho, gpres, w, grhok, adotoa, &
+    function diff_rhopi_Add_Term(this, dgrhoe, dgqe, grho, gpres, w, grhok, adotoa, &
         Kf1, k, grhov_t, z, k2, yprime, y, w_ix) result(ppiedot)
     class(TDarkEnergyModel), intent(in) :: this
     real(dl), intent(in) :: dgrhoe, dgqe, grho, gpres, grhok, w, adotoa, &
@@ -128,16 +140,17 @@
     subroutine PerturbationEvolve(this, ayprime, w, w_ix, a, adotoa, k, z, y)
     class(TDarkEnergyModel), intent(in) :: this
     real(dl), intent(inout) :: ayprime(:)
-    real(dl), intent(in) :: a,adotoa, k, z, y(:), w
+    real(dl), intent(in) :: a, adotoa, k, z, y(:), w
     integer, intent(in) :: w_ix
+
     end subroutine PerturbationEvolve
 
     subroutine PerturbationInitial(this, y, a, tau, k)
     class(TDarkEnergyModel), intent(in) :: this
     real(dl), intent(out) :: y(:)
     real(dl), intent(in) :: a, tau, k
-    !Get intinitial values for perturbations at a (or tau)
-    !For standard adiabatic perturbations can usually just set to zero to good accuracy
+    ! Get intinitial values for perturbations at a (or tau)
+    ! For standard adiabatic perturbations can usually just set to zero to good accuracy
 
     y = 0
 

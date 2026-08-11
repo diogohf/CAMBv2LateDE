@@ -176,6 +176,7 @@ class CambTest(unittest.TestCase):
                 "HMCode_A_baryon",
                 "HMCode_eta_baryon",
                 "HMCode_logT_AGN",
+                "HMCode_wiggle_max_fnu",
                 "cosmomc_theta",
                 "YHe",
                 "wa",
@@ -273,13 +274,18 @@ class CambTest(unittest.TestCase):
         )
         pars.set_for_lmax(2200, lens_potential_accuracy=1)
         pars.WantTensors = True
-        pars.NonLinearModel.set_params(halofit_version="mead2020_feedback", HMCode_logT_AGN=7.7)
+        pars.NonLinearModel.set_params(
+            halofit_version="mead2020_feedback", HMCode_logT_AGN=7.7, HMCode_wiggle_max_fnu=0.02
+        )
+        self.assertAlmostEqual(pars.NonLinearModel.HMCode_wiggle_max_fnu, 0.02)
         pars.Alens = 0.95
 
         with tempfile.TemporaryDirectory() as temp_dir:
             ini_file = os.path.join(temp_dir, "python_params.ini")
             pars.write_ini(ini_file)
             self.assertTrue(os.path.exists(ini_file))
+            round_tripped = camb.read_ini(ini_file)
+            self.assertAlmostEqual(round_tripped.NonLinearModel.HMCode_wiggle_max_fnu, 0.02)
 
     def testIniThetaInput(self):
         base_ini = os.path.join(os.path.dirname(__file__), "..", "..", "inifiles", "planck_2018.ini")
@@ -821,7 +827,7 @@ class CambTest(unittest.TestCase):
         data.calc_power_spectra(pars)
         _kh3, _z3, pk3 = data.get_matter_power_spectrum(1e-4, 1, 20)
         self.assertAlmostEqual(pk[-1][-3], 51.924, 2)
-        self.assertAlmostEqual(pk3[-1][-3], 57.723, 2)
+        self.assertAlmostEqual(pk3[-1][-3], 57.734, 2)
         self.assertAlmostEqual(pk2[-2][-4], 56.454, 2)
         camb.set_feedback_level(0)
 

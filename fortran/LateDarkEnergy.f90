@@ -13,6 +13,8 @@ module LateDE
         real(dl) :: w1
         real(dl), allocatable :: z_knot(:)
         real(dl), allocatable :: w_knot(:)
+        real(dl), allocatable :: a_flexknot(:)
+        real(dl), allocatable :: w_flexknot(:)
         contains
         procedure :: ReadParams => TLateDE_ReadParams
         procedure :: Init => TLateDE_Init
@@ -21,7 +23,7 @@ module LateDE
         procedure :: grho_de => TLateDE_grho_de
         procedure :: Effective_w_wa => TLateDE_Effective_w_wa   !VM: wont be called with CASARINI (our mod)         
         procedure, nopass :: SelfPointer => TLateDE_SelfPointer
-        procedure :: BackgroundDensityAndPressure => TLateDE_density ! DHFS: Do I Need This ? If yes why, if not why
+        procedure :: BackgroundDensityAndPressure => TLateDE_density 
     end type TLateDE
 
     public TLateDE
@@ -57,6 +59,29 @@ module LateDE
                     end if
                 end do
             
+            case(4)
+                ! Flexknot. Appendix A2 of 2503.08658v2
+                ! w(a) = m_i * a + c_i                 >>> Equation of state
+                ! m_i  = (w_i+1 - w_i) / (a_i+1 - a_i) >>> Slope
+                ! c_i  = w_i - m_i * a_i               >>> Intercept
+                if (size(this%a_flexknot) == 1) then
+                    w_de = this%w_flexknot(1)
+                else if (a <= this%a_flexknot(1)) then
+                    w_de = this%w_flexknot(1)
+                else if (a >= this%a_flexknot(size(this%a_flexknot))) then 
+                    w_de = this%w_flexknot(size(this%w_flexknot))
+                else
+                    do i = 1, size(this%a_flexknot)-1
+                        if (a <= this%a_flexknot(i+1)) then
+                            w_de = this%w_flexknot(i) + &
+                                (this%w_flexknot(i+1)-this%w_flexknot(i)) * &
+                                (a-this%a_flexknot(i)) / &
+                                (this%a_flexknot(i+1)-this%a_flexknot(i))
+                            exit
+                        end if
+                    end do       
+                end if
+
             case default        
                 stop "Invalid DEmodel"   
         end select
@@ -68,6 +93,7 @@ module LateDE
         real(dl), intent(in) :: a
         real(dl) :: grho_de, z
         real(dl) :: faci, temp
+        real(dl) :: a_lower, a_upper, m_i, c_i, integral
         integer  :: max_num_of_bins
         integer  :: i, j
 
@@ -112,6 +138,31 @@ module LateDE
                     grho_de = grho_de_today * faci
                 end if
 
+            case(4)
+                ! Flexknot. Appendix A2 of 2503.08658v2
+                if (size(this%a_flexknot) == 1) then
+                    ! n=1 flexknot = constant-w model
+                    grho_de = grho_de_today * &
+                              a**(-3._dl*(1._dl + this%w_flexknot(1)))
+                else
+                    integral = 0._dl
+                    do i = 1,size((this%a_flexknot))-1
+                        a_lower = max(a,this%a_flexknot(i))
+                        a_upper = this%a_flexknot(i+1)
+                        
+                        if (a_upper > a_lower) then
+                            m_i = (this%w_flexknot(i+1) - this%w_flexknot(i)) / &
+                                  (this%a_flexknot(i+1) - this%a_flexknot(i))
+                            c_i = this%w_flexknot(i) - m_i*this%a_flexknot(i)
+
+                            integral = integral + &
+                                       (1._dl+c_i)*log(a_upper/a_lower) + &
+                                       m_i*(a_upper-a_lower)
+                        end if
+                    end do    
+                    grho_de = grho_de_today * exp(3._dl*integral)
+                end if    
+
             case default
                 stop "Invalid DEmodel"
         end select
@@ -150,16 +201,23 @@ module LateDE
         class(TLateDE), intent(inout) :: this
         real(dl), intent(out) :: w, wa
 
-        if (this%DEmodel == 2) then
-            !'w0wa'
-            w  = this%w0
-            wa = this%w1
-        else if (this%DEmodel /= 2) then
-            w  = this%w0
-            wa = 0
-        else
-            stop "[Late Fluid DE @TLateDE_Effective_w_wa] Invalid Dark Energy Model (TLateDE_Effective_w_wa)"
-        endif
+        select case (this%DEmodel)
+            case(1) 
+                ! constant w
+                w = this%w0
+                wa = 0._dl
+            case(2)
+                ! CPL    
+                w = this%w0
+                wa = this%w1
+            case(3)
+                ! No unique CPL equivalent for binned w(z)
+                stop "[TLateDE_Effective_w_wa] Effective (w,wa) not defined for binned w(z)"
+    
+            case(4)
+                ! No unique CPL equivalent for flexknots
+                stop "[TLateDE_Effective_w_wa] Effective (w,wa) not defined for flexknots"
+        end select
     end subroutine TLateDE_Effective_w_wa
 
     subroutine TLateDE_SelfPointer(cptr,P)
@@ -174,6 +232,8 @@ module LateDE
 
     subroutine TLateDE_density(this, grhov, a, grhov_t, w)
         ! Get grhov_t = 8*pi*G*rho_de*a**2 and (optionally) equation of state at scale factor a
+        ! DHFS Note: translate the parameterization-specific 
+        ! function into the quantities CAMB expects at a given scale factor
         class(TLateDE), intent(inout) :: this
         real(dl), intent(in) :: grhov, a
         real(dl), intent(out) :: grhov_t

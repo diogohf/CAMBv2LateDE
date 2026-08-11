@@ -38,9 +38,19 @@ class LateDE(DarkEnergyModel):
         ("w1", c_double, "CPL wa"),
         ("z_knot", AllocatableArrayDouble, "Bin upper redshift boundaries"),
         ("w_knot", AllocatableArrayDouble, "Equation of state in each bin"),
+        ("a_flexknot", AllocatableArrayDouble, "Flexknot scale-factor positions"),
+        ("w_flexknot", AllocatableArrayDouble, "Flexknot equation-of-state values"),
     ]
 
-    def set_params(self,DEmodel=1,w0=-1,w1=0,z_knot=None,w_knot=None):
+    def set_params(self,
+                   DEmodel=1,
+                   w0=-1,
+                   w1=0,
+                   z_knot=None,
+                   w_knot=None,
+                   a_flexknot=None,
+                   w_flexknot=None,
+                   ):
         self.DEmodel = DEmodel
         self.w0 = w0
         self.w1 = w1
@@ -66,6 +76,58 @@ class LateDE(DarkEnergyModel):
 
             self.z_knot = z_knot
             self.w_knot = w_knot
+
+        elif DEmodel == 4:
+            a_flexknot = np.asarray(
+                a_flexknot,
+                dtype=np.float64
+            )
+
+            w_flexknot = np.asarray(
+                w_flexknot,
+                dtype=np.float64
+            )
+
+            if a_flexknot.ndim != 1:
+                raise ValueError(
+                    "a_flexknot must be one-dimensional"
+                )
+
+            if w_flexknot.ndim != 1:
+                raise ValueError(
+                    "w_flexknot must be one-dimensional"
+                )
+
+            if len(a_flexknot) != len(w_flexknot):
+                raise ValueError(
+                    "a_flexknot and w_flexknot "
+                    "must have the same length"
+                )
+
+            if len(a_flexknot) == 0:
+                raise ValueError(
+                    "At least one flexknot is required"
+                )
+
+            if len(a_flexknot) > 1:
+
+                if not np.isclose(a_flexknot[0], 0.0):
+                    raise ValueError(
+                        "First flexknot must be at a=0"
+                    )
+
+                if not np.isclose(a_flexknot[-1], 1.0):
+                    raise ValueError(
+                        "Last flexknot must be at a=1"
+                    )
+
+                if np.any(np.diff(a_flexknot) <= 0):
+                    raise ValueError(
+                        "a_flexknot must be strictly increasing"
+                    )
+
+            self.a_flexknot = a_flexknot
+            self.w_flexknot = w_flexknot
 
 
 @fortran_class

@@ -47,6 +47,7 @@ testfile*
 !ScalEqs.ipynb
 !InitialConditionSeries.ipynb
 !docs/SPk_demo.ipynb
+!docs/test_latede.ipynb
 *.dll
 *.a
 *.o

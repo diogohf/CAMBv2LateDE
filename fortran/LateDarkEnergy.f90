@@ -5,52 +5,162 @@ module LateDE
     use classes
     implicit none
 
+    private
+    real(dl) :: grho_de_today
     type, extends(TDarkEnergyModel) :: TLateDE
-        real(dl) :: w_n = 1._dl !Effective equation of state when oscillating
-        real(dl) :: fde_zc = 0._dl ! energy density fraction at a_c (not the same as peak dark energy fraction)
-        real(dl) :: zc  !transition redshift (scale factor a_c)
-        real(dl) :: theta_i = const_pi/2 !Initial value
-        !om is Omega of the early DE component today (assumed to be negligible compared to omega_lambda)
-        !omL is the lambda component of the total dark energy omega
-        real(dl), private :: a_c, pow, om, omL, acpow, freq, n !cached internally
-        
+        integer  :: DEmodel
+        real(dl) :: w0
+        real(dl) :: w1
+        real(dl), allocatable :: z_knot(:)
+        real(dl), allocatable :: w_knot(:)
         contains
-
-        procedure :: ReadParams =>  TLateDE_ReadParams
-        procedure, nopass :: PythonClass => TLateDE_PythonClass
-        procedure, nopass :: SelfPointer => TLateDE_SelfPointer
+        procedure :: ReadParams => TLateDE_ReadParams
         procedure :: Init => TLateDE_Init
+        procedure :: PrintFeedback => TLateDE_PrintFeedback
         procedure :: w_de => TLateDE_w_de
         procedure :: grho_de => TLateDE_grho_de
-        procedure :: PerturbedStressEnergy => TLateDE_PerturbedStressEnergy
-        procedure :: PerturbationEvolve => TLateDE_PerturbationEvolve
+        procedure :: Effective_w_wa => TLateDE_Effective_w_wa   !VM: wont be called with CASARINI (our mod)         
+        procedure, nopass :: SelfPointer => TLateDE_SelfPointer
+        procedure :: BackgroundDensityAndPressure => TLateDE_density ! DHFS: Do I Need This ? If yes why, if not why
     end type TLateDE
 
     public TLateDE
 
     contains
 
+    function TLateDE_w_de(this, a) result(w_de)
+        class(TLateDE) :: this
+        real(dl), intent(in) :: a    
+        real(dl) :: w_de, z
+        integer  :: i
+
+        w_de = 0
+        z = 1.0_dl/a - 1.0_dl
+
+        select case (this%DEmodel)
+            case(1) 
+                ! Constant w
+                w_de = this%w0
+            
+            case(2)
+                ! CPL parametrization w0wa
+                w_de = this%w0 + this%w1*(1._dl - a)
+            
+            case(3)
+                ! Piecewise-constant binned w
+                z = 1._dl / a - 1._dl
+                w_de = -1._dl
+                do i = 1, size(this%z_knot)
+                    if (z < this%z_knot(i)) then
+                        w_de = this%w_knot(i)
+                        exit
+                    end if
+                end do
+            
+            case default        
+                stop "Invalid DEmodel"   
+        end select
+    end function TLateDE_w_de
+
+    function TLateDE_grho_de(this, a) result(grho_de)
+        ! Returns 8*pi*G * rho_de, no factor of a^4
+        class(TLateDE) :: this
+        real(dl), intent(in) :: a
+        real(dl) :: grho_de, z
+        real(dl) :: faci, temp
+        integer  :: max_num_of_bins
+        integer  :: i, j
+
+        grho_de = 0
+        z = 1.0_dl/a - 1.0_dl
+
+        select case (this%DEmodel)
+            case(1)
+                ! Constant w
+                grho_de = grho_de_today * a**(-3 * (1 + this%w0))
+
+            case(2)
+                ! CPL parametrization w0wa
+                grho_de = grho_de_today * a**(-3 * (1 + this%w0 + this%w1)) * exp(-3 * this%w1 * (1 - a))
+            
+            case(3)
+                ! Piecewise-constant binned w
+                max_num_of_bins = size(this%z_knot)
+                do i = 1, max_num_of_bins
+                    if ( i==1 ) then
+                        faci = 1.0_dl
+                    else
+                        faci = 1.0_dl
+                        do j = 1, i-1
+                            temp = (1.0_dl + this%z_knot(j))**(3.0_dl * (this%w_knot(j) - this%w_knot(j+1)))
+                            faci = faci * temp 
+                        end do
+                    end if
+    
+                    if (z < this%z_knot(i)) then
+                        grho_de = grho_de_today * faci * a**(-3.0_dl * (1.0_dl + this%w_knot(i)))
+                    exit
+                    end if
+                end do
+                if ( z > this%z_knot(max_num_of_bins) ) then
+                    faci = 1.0_dl
+                    do i = 1, max_num_of_bins-1
+                        temp = (1.0_dl+this%z_knot(i))**(3.0_dl * (this%w_knot(i) - this%w_knot(i+1)))
+                        faci = faci * temp
+                    end do
+                    faci = faci * (1.0_dl + this%z_knot(max_num_of_bins))**(3.0_dl * (this%w_knot(max_num_of_bins) - (-1.0_dl)))
+                    grho_de = grho_de_today * faci
+                end if
+
+            case default
+                stop "Invalid DEmodel"
+        end select
+    end function TLateDE_grho_de
+
+    subroutine TLateDE_Init(this, State)
+        use classes
+        use results
+        class(TLateDE), intent(inout) :: this
+        class(TCAMBdata), intent(in), target :: State
+
+        select type (State)
+            type is (CAMBdata)
+            grho_de_today = State%grhov
+        end select      
+    end subroutine TLateDE_Init
+
     subroutine TLateDE_ReadParams(this, Ini)
         use IniObjects
+        use FileUtils
         class(TLateDE) :: this
         class(TIniFile), intent(in) :: Ini
-
-        call this%TDarkEnergyModel%ReadParams(Ini)
-        if (Ini%HasKey('AxionEffectiveFluid_a_c')) then
-            error stop 'AxionEffectiveFluid inputs changed to AxionEffectiveFluid_fde_zc and AxionEffectiveFluid_zc'
-        end if
-        this%w_n  = Ini%Read_Double('AxionEffectiveFluid_w_n')
-        this%fde_zc  = Ini%Read_Double('AxionEffectiveFluid_fde_zc')
-        this%zc  = Ini%Read_Double('AxionEffectiveFluid_zc')
-        call Ini%Read('AxionEffectiveFluid_theta_i', this%theta_i)
+        this%DEmodel = Ini%Read_Int('DEmodel', 1)
+        this%w0 = Ini%Read_Double('w0', 0.0_dl)
     end subroutine TLateDE_ReadParams
+    
+    subroutine TLateDE_PrintFeedback(this, FeedbackLevel)
+        class(TLateDE) :: this
+        integer, intent(in) :: FeedbackLevel
 
+        if (FeedbackLevel >0) write(*,'("(w0, wa) = (", f8.5,", ", f8.5, ")")') !&
+        ! &   this%w_lam, this%wa
+    end subroutine TLateDE_PrintFeedback
 
-    function TLateDE_PythonClass()
-        character(LEN=:), allocatable :: TLateDE_PythonClass
+    subroutine TLateDE_Effective_w_wa(this, w, wa)
+        class(TLateDE), intent(inout) :: this
+        real(dl), intent(out) :: w, wa
 
-        TLateDE_PythonClass = 'AxionEffectiveFluid'
-    end function TLateDE_PythonClass
+        if (this%DEmodel == 2) then
+            !'w0wa'
+            w  = this%w0
+            wa = this%w1
+        else if (this%DEmodel /= 2) then
+            w  = this%w0
+            wa = 0
+        else
+            stop "[Late Fluid DE @TLateDE_Effective_w_wa] Invalid Dark Energy Model (TLateDE_Effective_w_wa)"
+        endif
+    end subroutine TLateDE_Effective_w_wa
 
     subroutine TLateDE_SelfPointer(cptr,P)
         use iso_c_binding
@@ -62,112 +172,21 @@ module LateDE
         P => PType
     end subroutine TLateDE_SelfPointer
 
-    subroutine TLateDE_Init(this, State)
-        use classes
+    subroutine TLateDE_density(this, grhov, a, grhov_t, w)
+        ! Get grhov_t = 8*pi*G*rho_de*a**2 and (optionally) equation of state at scale factor a
         class(TLateDE), intent(inout) :: this
-        class(TCAMBdata), intent(in), target :: State
-        real(dl) :: grho_rad, F, p, mu, xc, n
+        real(dl), intent(in) :: grhov, a
+        real(dl), intent(out) :: grhov_t
+        real(dl), optional, intent(out) :: w
 
-        select type(State)
-        class is (CAMBdata)
-            this%is_cosmological_constant = this%fde_zc==0
-            this%pow = 3*(1+this%w_n)
-            this%a_c = 1/(1+this%zc)
-            this%acpow = this%a_c**this%pow
-            !Omega in early de at z=0
-            this%om = 2*this%fde_zc/(1-this%fde_zc)*&
-                (State%grho_no_de(this%a_c)/this%a_c**4/State%grhocrit + State%Omega_de)/(1 + 1/this%acpow)
-            this%omL = State%Omega_de - this%om !Omega_de is total dark energy density today
-            this%num_perturb_equations = 2
-            if (this%w_n < 0.9999) then
-                ! n <> infinity
-                !get (very) approximate result for sound speed parameter; arXiv:1806.10608 Eq 30
-                !(but mu may not exactly agree with what they used)
-                n = nint((1+this%w_n)/(1-this%w_n))
-                !Assume radiation domination, standard neutrino model; H0 factors cancel
-                grho_rad = (kappa/c**2*4*sigma_boltz/c**3*State%CP%tcmb**4*Mpc**2*(1+default_nnu*7._dl/8*(4._dl/11)**(4._dl/3)))
-                xc = this%a_c**2/2/sqrt(grho_rad/3)
-                F=7./8
-                p=1./2
-                mu = 1/xc*(1-cos(this%theta_i))**((1-n)/2.)*sqrt((1-F)*(6*p+2)*this%theta_i/n/sin(this%theta_i))
-                this%freq =  mu*(1-cos(this%theta_i))**((n-1)/2.)* &
-                    sqrt(const_pi)*Gamma((n+1)/(2.*n))/Gamma(1+0.5/n)*2.**(-(n**2+1)/(2.*n))*3.**((1./n-1)/2)*this%a_c**(-6./(n+1)+3) &
-                    *( this%a_c**(6*n/(n+1.))+1)**(0.5*(1./n-1))
-                this%n = n
-            end if
-        end select
-    end subroutine TLateDE_Init
-
-
-    function TLateDE_w_de(this, a)
-        class(TLateDE) :: this
-        real(dl) :: TLateDE_w_de
-        real(dl), intent(IN) :: a
-        real(dl) :: om_t, apow, apc
-
-        apow = a**this%pow
-        apc = apow + this%acpow
-        om_t = this%om*(1+this%acpow)/apc !early DE contribution to relative density
-        TLateDE_w_de = om_t*(1+this%w_n)*apow/(apc*(this%omL+om_t)) - 1
-    end function TLateDE_w_de
-
-    function TLateDE_grho_de(this, a)  !relative density (8 pi G a^4 rho_de /grhov)
-        class(TLateDE) :: this
-        real(dl) :: TLateDE_grho_de, apc
-        real(dl), intent(IN) :: a
-
-        if(a == 0.d0)then
-            TLateDE_grho_de = 0.d0
+        if (a > 1e-10) then
+            grhov_t = this%grho_de(a) * a**2
         else
-            apc = a**this%pow + this%acpow
-            TLateDE_grho_de = (this%omL*apc+this%om*(1+this%acpow))*a**4 &
-                /(apc*(this%omL+this%om))
-        endif
-    end function TLateDE_grho_de
-
-    subroutine TLateDE_PerturbationEvolve(this, ayprime, w, w_ix, &
-        a, adotoa, k, z, y)
-        class(TLateDE), intent(in) :: this
-        real(dl), intent(inout) :: ayprime(:)
-        real(dl), intent(in) :: a, adotoa, w, k, z, y(:)
-        integer, intent(in) :: w_ix
-        real(dl) Hv3_over_k, deriv, apow, acpow, apc, cs2, fac, k2
-
-        k2 = k**2
-        apow = a**this%pow
-        acpow = this%acpow
-        if (this%w_n < 0.9999) then
-            !a**(2-6*this%w_n) = a**8/apow**2 since pow = 3*(1+w_n)
-            fac = 2*this%freq**2*a**8/apow**2
-            cs2 = (fac*(this%n-1) + k2)/(fac*(this%n+1) + k2)
-        else
-            cs2 = 1
+            grhov_t = 0
         end if
-        apc = apow + acpow
-        Hv3_over_k =  3*adotoa* y(w_ix + 1) / k
-        ! dw/dlog a/(1+w)
-        deriv  = (acpow**2*(this%om+this%omL)+this%om*acpow-apow**2*this%omL)*this%pow &
-            /(apc*(this%omL*apc+this%om*(1+acpow)))
-        !density perturbation
-        ayprime(w_ix) = -3 * adotoa * (cs2 - w) *  (y(w_ix) + Hv3_over_k) &
-            -   k * y(w_ix + 1) - (1 + w) * k * z  - adotoa*deriv* Hv3_over_k
-        !(1+w)v
-        ayprime(w_ix + 1) = -adotoa * (1 - 3 * cs2 - deriv) * y(w_ix + 1) + &
-            k * cs2 * y(w_ix)
-    end subroutine TLateDE_PerturbationEvolve
-
-
-    subroutine TLateDE_PerturbedStressEnergy(this, dgrhoe, dgqe, &
-        a, dgq, dgrho, grho, grhov_t, w, gpres_noDE, etak, adotoa, k, kf1, ay, ayprime, w_ix)
-        class(TLateDE), intent(inout) :: this
-        real(dl), intent(out) :: dgrhoe, dgqe
-        real(dl), intent(in) :: a, dgq, dgrho, grho, grhov_t, w, gpres_noDE, etak, adotoa, k, kf1
-        real(dl), intent(in) :: ay(*)
-        real(dl), intent(inout) :: ayprime(*)
-        integer, intent(in) :: w_ix
-
-        dgrhoe = ay(w_ix) * grhov_t
-        dgqe = ay(w_ix + 1) * grhov_t
-    end subroutine TLateDE_PerturbedStressEnergy
+        if (present(w)) then
+            w = this%w_de(a)
+        end if
+    end subroutine TLateDE_density
 
 end module LateDE

@@ -34,22 +34,38 @@ class LateDE(DarkEnergyModel):
 
     _fields_ = [
         ("DEmodel", c_int, "Dark-energy parameterization"),
+        # Constant w and CPL
         ("w0", c_double, "Constant-w or CPL w0"),
         ("w1", c_double, "CPL wa"),
+        # Bin w
         ("z_knot", AllocatableArrayDouble, "Bin upper redshift boundaries"),
         ("w_knot", AllocatableArrayDouble, "Equation of state in each bin"),
+        # Flexknots
         ("a_flexknot", AllocatableArrayDouble, "Flexknot scale-factor positions"),
         ("w_flexknot", AllocatableArrayDouble, "Flexknot equation-of-state values"),
+        # Chebyshev
+        ("cheb_c0", c_double, "Chebyshev C0"),
+        ("cheb_c1", c_double, "Chebyshev C1"),
+        ("cheb_c2", c_double, "Chebyshev C2"),
+        ("cheb_c3", c_double, "Chebyshev C3"),
+        ("cheb_zmax", c_double, "Maximum Chebyshev redshift"),
+        ("cheb_delta", c_double, "High-z transition width"),
     ]
 
     def set_params(self,
-                   DEmodel=1,
-                   w0=-1,
-                   w1=0,
-                   z_knot=None,
-                   w_knot=None,
-                   a_flexknot=None,
-                   w_flexknot=None,
+                    DEmodel=1,
+                    w0=-1,
+                    w1=0,
+                    z_knot=None,
+                    w_knot=None,
+                    a_flexknot=None,
+                    w_flexknot=None,
+                    cheb_c0=1.0,
+                    cheb_c1=0.0,
+                    cheb_c2=0.0,
+                    cheb_c3=0.0,
+                    cheb_zmax=3.5,
+                    cheb_delta=1.0,
                    ):
         self.DEmodel = DEmodel
         self.w0 = w0
@@ -129,6 +145,24 @@ class LateDE(DarkEnergyModel):
             self.a_flexknot = a_flexknot
             self.w_flexknot = w_flexknot
 
+        elif DEmodel == 5:
+
+            if cheb_zmax <= 0:
+                raise ValueError(
+                    "cheb_zmax must be positive"
+                )
+
+            if cheb_delta <= 0:
+                raise ValueError(
+                    "cheb_delta must be positive"
+                )
+
+            self.cheb_c0 = cheb_c0
+            self.cheb_c1 = cheb_c1
+            self.cheb_c2 = cheb_c2
+            self.cheb_c3 = cheb_c3
+            self.cheb_zmax = cheb_zmax
+            self.cheb_delta = cheb_delta
 
 @fortran_class
 class DarkEnergyPPF(LateDE):

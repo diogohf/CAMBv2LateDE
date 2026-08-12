@@ -9,12 +9,22 @@ module LateDE
     real(dl) :: grho_de_today
     type, extends(TDarkEnergyModel) :: TLateDE
         integer  :: DEmodel
+        ! Constant w and CPL
         real(dl) :: w0
         real(dl) :: w1
+        ! Bin w
         real(dl), allocatable :: z_knot(:)
         real(dl), allocatable :: w_knot(:)
+        ! Flexknots - Ormondroyd et al. 2025, arXiv:2503.08658
         real(dl), allocatable :: a_flexknot(:)
         real(dl), allocatable :: w_flexknot(:)
+        ! Chebyshev polynomials - Calderon et al. 2024, arXiv:2405.04216v1
+        real(dl) :: cheb_c0
+        real(dl) :: cheb_c1
+        real(dl) :: cheb_c2
+        real(dl) :: cheb_c3
+        real(dl) :: cheb_zmax
+        real(dl) :: cheb_delta
         contains
         procedure :: ReadParams => TLateDE_ReadParams
         procedure :: Init => TLateDE_Init
@@ -34,7 +44,10 @@ module LateDE
         class(TLateDE) :: this
         real(dl), intent(in) :: a    
         real(dl) :: w_de, z
-        integer  :: i
+        real(dl) :: x
+        real(dl) :: T0, T1, T2, T3
+        real(dl) :: B0, B1, u
+        integer :: i
 
         w_de = 0
         z = 1.0_dl/a - 1.0_dl
@@ -60,7 +73,8 @@ module LateDE
                 end do
             
             case(4)
-                ! Flexknot. Appendix A2 of 2503.08658v2
+                ! Flexknots
+                ! Appendix A2 of Ormondroyd et al. 2025, 2503.08658v2
                 ! w(a) = m_i * a + c_i                 >>> Equation of state
                 ! m_i  = (w_i+1 - w_i) / (a_i+1 - a_i) >>> Slope
                 ! c_i  = w_i - m_i * a_i               >>> Intercept
@@ -82,6 +96,36 @@ module LateDE
                     end do       
                 end if
 
+            case(5)
+                ! Chebyshev 
+                ! Calderon et al. 2024, Eqs. (2.1), (2.2), (2.5)
+                if (z <= this%cheb_zmax) then
+                    x = -1._dl + 2._dl*z/this%cheb_zmax ! Because zmin=0
+                    T0 = 1._dl
+                    T1 = x
+                    T2 = 2._dl*x**2 - 1._dl
+                    T3 = 4._dl*x**3 - 3._dl*x
+                    w_de = -(this%cheb_c0*T0 + &
+                            this%cheb_c1*T1 + &
+                            this%cheb_c2*T2 + &
+                            this%cheb_c3*T3)
+                else
+                    ! Smooth transition to w=-1 beyond zmax 
+                    u = log((1+z)/(1+this%cheb_zmax))
+                    
+                    B0 = 1._dl - (this%cheb_c0 + &
+                                  this%cheb_c1 + &  
+                                  this%cheb_c2 + &  
+                                  this%cheb_c3)
+
+                    B1 = -2._dl * (1+this%cheb_zmax)/this%cheb_zmax * &
+                                  (this%cheb_c1 + & 
+                                   4._dl*this%cheb_c2 + &
+                                   9._dl*this%cheb_c3)
+                    
+                    w_de = -1._dl+(B0+B1*u)*exp(-u**2/this%cheb_delta**2)                    
+                endif
+
             case default        
                 stop "Invalid DEmodel"   
         end select
@@ -92,10 +136,17 @@ module LateDE
         class(TLateDE) :: this
         real(dl), intent(in) :: a
         real(dl) :: grho_de, z
+        ! Bin w
         real(dl) :: faci, temp
-        real(dl) :: a_lower, a_upper, m_i, c_i, integral
         integer  :: max_num_of_bins
         integer  :: i, j
+        ! Flexknots
+        real(dl) :: a_lower, a_upper, m_i, c_i, integral
+        ! Chebyshev
+        real(dl) :: alpha
+        real(dl) :: q0, q1, q2, q3
+        real(dl) :: Ipoly, Imax, Itrans
+        real(dl) :: B0, B1, u
 
         grho_de = 0
         z = 1.0_dl/a - 1.0_dl
@@ -139,7 +190,8 @@ module LateDE
                 end if
 
             case(4)
-                ! Flexknot. Appendix A2 of 2503.08658v2
+                ! Flexknots
+                ! Appendix A2 of Ormondroyd et al. 2025, 2503.08658v2
                 if (size(this%a_flexknot) == 1) then
                     ! n=1 flexknot = constant-w model
                     grho_de = grho_de_today * &
@@ -162,6 +214,9 @@ module LateDE
                     end do    
                     grho_de = grho_de_today * exp(3._dl*integral)
                 end if    
+
+            case(5)
+                grho_de = 0._dl
 
             case default
                 stop "Invalid DEmodel"
@@ -217,6 +272,9 @@ module LateDE
             case(4)
                 ! No unique CPL equivalent for flexknots
                 stop "[TLateDE_Effective_w_wa] Effective (w,wa) not defined for flexknots"
+            
+            case(5)
+                stop "[TLateDE_Effective_w_wa] Effective (w,wa) not defined for Chebyshev w(z)"
         end select
     end subroutine TLateDE_Effective_w_wa
 

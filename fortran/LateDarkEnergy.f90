@@ -18,7 +18,7 @@ module LateDE
         ! Flexknots - Ormondroyd et al. 2025, arXiv:2503.08658
         real(dl), allocatable :: a_flexknot(:)
         real(dl), allocatable :: w_flexknot(:)
-        ! Chebyshev polynomials - Calderon et al. 2024, arXiv:2405.04216v1
+        ! Chebyshev - Calderon et al. 2024, arXiv:2405.04216v1
         real(dl) :: cheb_c0
         real(dl) :: cheb_c1
         real(dl) :: cheb_c2
@@ -98,7 +98,8 @@ module LateDE
 
             case(5)
                 ! Chebyshev 
-                ! Calderon et al. 2024, Eqs. (2.1), (2.2), (2.5)
+                ! Calderon et al. 2024, arXiv:2405.04216v1
+                ! Eqs. (2.1), (2.2), (2.5)
                 if (z <= this%cheb_zmax) then
                     x = -1._dl + 2._dl*z/this%cheb_zmax ! Because zmin=0
                     T0 = 1._dl
@@ -216,7 +217,74 @@ module LateDE
                 end if    
 
             case(5)
-                grho_de = 0._dl
+                ! Chebyshev
+                ! Calderon et al. 2024, arXiv:2405.04216v1
+                ! Eq. (2.4)
+                alpha = 2._dl / this%cheb_zmax
+                ! 1 + w(z) = q0 + q1*z + q2*z^2 + q3*z^3
+
+                q0 = 1._dl - this%cheb_c0 + this%cheb_c1 &
+                           - this%cheb_c2 + this%cheb_c3
+
+                q1 = -alpha * ( &
+                                this%cheb_c1 &
+                                - 4._dl*this%cheb_c2 &
+                                + 9._dl*this%cheb_c3 )
+
+                q2 = -alpha**2 * ( &
+                                2._dl*this%cheb_c2 &
+                                - 12._dl*this%cheb_c3 )
+
+                q3 = -4._dl*alpha**3*this%cheb_c3
+
+                if (z <= this%cheb_zmax) then
+                    Ipoly = &
+                        q0*log(1._dl + z) + &
+                        q1*(z - log(1._dl + z)) + &
+                        q2*(0.5_dl*z**2 - z + log(1._dl + z)) + &
+                        q3*(z**3/3._dl - 0.5_dl*z**2 + z - &
+                            log(1._dl + z))
+                    grho_de = grho_de_today * exp(3._dl*Ipoly)
+                else    
+                    ! Integral from z=0 to z=zmax
+                    Imax = &
+                        q0*log(1._dl + this%cheb_zmax) + &
+                        q1*(this%cheb_zmax - &
+                            log(1._dl + this%cheb_zmax)) + &
+                        q2*(0.5_dl*this%cheb_zmax**2 - &
+                            this%cheb_zmax + &
+                            log(1._dl + this%cheb_zmax)) + &
+                        q3*(this%cheb_zmax**3/3._dl - &
+                            0.5_dl*this%cheb_zmax**2 + &
+                            this%cheb_zmax - &
+                            log(1._dl + this%cheb_zmax))
+
+                    B0 = 1._dl - ( &
+                        this%cheb_c0 + &
+                        this%cheb_c1 + &
+                        this%cheb_c2 + &
+                        this%cheb_c3 )   
+
+                    B1 = -2._dl*(1._dl + this%cheb_zmax) / &
+                        this%cheb_zmax * &
+                        (this%cheb_c1 + &
+                        4._dl*this%cheb_c2 + &
+                        9._dl*this%cheb_c3)     
+                    
+                    u = log((1._dl + z) / &
+                        (1._dl + this%cheb_zmax))
+            
+                    Itrans = &
+                        B0 * sqrt(acos(-1._dl)) * &
+                        this%cheb_delta / 2._dl * &
+                        erf(u/this%cheb_delta) + &
+                        B1 * this%cheb_delta**2 / 2._dl * &
+                        (1._dl - &
+                         exp(-u**2/this%cheb_delta**2))
+                         
+                    grho_de = grho_de_today * &
+                        exp(3._dl*(Imax + Itrans))
+                endif    
 
             case default
                 stop "Invalid DEmodel"

@@ -50,6 +50,13 @@ class LateDE(DarkEnergyModel):
         ("cheb_c3", c_double, "Chebyshev C3"),
         ("cheb_zmax", c_double, "Maximum Chebyshev redshift"),
         ("cheb_delta", c_double, "High-z transition width"),
+        # Bernstein
+        ("bern_b0", c_double, "Bernstein b0"),
+        ("bern_b1", c_double, "Bernstein b1"),
+        ("bern_b2", c_double, "Bernstein b2"),
+        ("bern_b3", c_double, "Bernstein b3"),
+        ("bern_zmax", c_double, "Maximum Bernstein redshift"),
+        ("bern_delta", c_double, "High-z transition width"),
     ]
 
     def set_params(self,
@@ -66,6 +73,12 @@ class LateDE(DarkEnergyModel):
                     cheb_c3=0.0,
                     cheb_zmax=3.5,
                     cheb_delta=1.0,
+                    bern_b0=-1.0,
+                    bern_b1=-1.0,
+                    bern_b2=-1.0,
+                    bern_b3=-1.0,
+                    bern_zmax=3.5,
+                    bern_delta=1.0,
                    ):
         self.DEmodel = DEmodel
         self.w0 = w0
@@ -163,6 +176,25 @@ class LateDE(DarkEnergyModel):
             self.cheb_c3 = cheb_c3
             self.cheb_zmax = cheb_zmax
             self.cheb_delta = cheb_delta
+        
+        elif DEmodel == 6:
+
+            if bern_zmax <= 0:
+                raise ValueError(
+                    "bern_zmax must be positive"
+                )
+
+            if bern_delta <= 0:
+                raise ValueError(
+                    "bern_delta must be positive"
+                )
+
+            self.bern_b0 = bern_b0
+            self.bern_b1 = bern_b1
+            self.bern_b2 = bern_b2
+            self.bern_b3 = bern_b3
+            self.bern_zmax = bern_zmax
+            self.bern_delta = bern_delta
 
 @fortran_class
 class DarkEnergyPPF(LateDE):

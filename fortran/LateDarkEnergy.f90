@@ -25,6 +25,13 @@ module LateDE
         real(dl) :: cheb_c3
         real(dl) :: cheb_zmax
         real(dl) :: cheb_delta
+        ! Bernstein
+        real(dl) :: bern_b0
+        real(dl) :: bern_b1
+        real(dl) :: bern_b2
+        real(dl) :: bern_b3
+        real(dl) :: bern_zmax
+        real(dl) :: bern_delta
         contains
         procedure :: ReadParams => TLateDE_ReadParams
         procedure :: Init => TLateDE_Init
@@ -47,6 +54,7 @@ module LateDE
         real(dl) :: x
         real(dl) :: T0, T1, T2, T3
         real(dl) :: B0, B1, u
+        real(dl) :: A0, A1
         integer :: i
 
         w_de = 0
@@ -127,6 +135,57 @@ module LateDE
                     w_de = -1._dl+(B0+B1*u)*exp(-u**2/this%cheb_delta**2)                    
                 endif
 
+            case(6)
+                ! Bernstein polynomial
+                !
+                ! Cubic Bernstein representation:
+                !
+                ! w(z) = b0*(1-x)^3
+                !      + 3*b1*x*(1-x)^2
+                !      + 3*b2*x^2*(1-x)
+                !      + b3*x^3
+                !
+                ! where x = z / zmax.
+                !
+                ! For z > zmax, smoothly transition to w = -1,
+                ! matching both w and dw/dz at z = zmax.
+
+                if (z <= this%bern_zmax) then
+
+                    x = z / this%bern_zmax
+
+                    w_de = &
+                        this%bern_b0*(1._dl-x)**3 + &
+                        3._dl*this%bern_b1*x*(1._dl-x)**2 + &
+                        3._dl*this%bern_b2*x**2*(1._dl-x) + &
+                        this%bern_b3*x**3
+
+                else
+
+                    ! Logarithmic distance from zmax
+                    u = log((1._dl + z) / &
+                            (1._dl + this%bern_zmax))
+
+                    ! Match w at z = zmax:
+                    ! w(zmax) = b3
+                    A0 = 1._dl + this%bern_b3
+
+                    ! Match dw/dz at z = zmax:
+                    !
+                    ! dw/dz |zmax = 3*(b3-b2)/zmax
+                    !
+                    ! and dz/du |zmax = 1+zmax
+                    A1 = 3._dl * &
+                         (1._dl + this%bern_zmax) / &
+                         this%bern_zmax * &
+                         (this%bern_b3 - this%bern_b2)
+
+                    w_de = -1._dl + &
+                           (A0 + A1*u) * &
+                           exp(-u**2 / this%bern_delta**2)
+
+                end if
+
             case default        
                 stop "Invalid DEmodel"   
         end select
@@ -143,11 +202,12 @@ module LateDE
         integer  :: i, j
         ! Flexknots
         real(dl) :: a_lower, a_upper, m_i, c_i, integral
-        ! Chebyshev
+        ! Chebyshev / Bernstein
         real(dl) :: alpha
         real(dl) :: q0, q1, q2, q3
         real(dl) :: Ipoly, Imax, Itrans
         real(dl) :: B0, B1, u
+        real(dl) :: A0, A1
 
         grho_de = 0
         z = 1.0_dl/a - 1.0_dl
@@ -286,6 +346,104 @@ module LateDE
                         exp(3._dl*(Imax + Itrans))
                 endif    
 
+            case(6)
+                ! Bernstein polynomial
+                !
+                ! w(z) =
+                !   b0*(1-x)^3
+                ! + 3*b1*x*(1-x)^2
+                ! + 3*b2*x^2*(1-x)
+                ! + b3*x^3
+                !
+                ! with x = z/zmax.
+                !
+                ! Expanding:
+                !
+                ! 1 + w(z) = q0 + q1*z + q2*z^2 + q3*z^3
+
+                q0 = 1._dl + this%bern_b0
+
+                q1 = 3._dl * &
+                     (this%bern_b1 - this%bern_b0) / &
+                     this%bern_zmax
+
+                q2 = 3._dl * &
+                     (this%bern_b0 - &
+                      2._dl*this%bern_b1 + &
+                      this%bern_b2) / &
+                     this%bern_zmax**2
+
+                q3 = (-this%bern_b0 + &
+                       3._dl*this%bern_b1 - &
+                       3._dl*this%bern_b2 + &
+                       this%bern_b3) / &
+                     this%bern_zmax**3
+
+
+                if (z <= this%bern_zmax) then
+
+                    ! I(z) = integral_0^z
+                    !        [1+w(z')] / [1+z'] dz'
+
+                    Ipoly = &
+                        q0*log(1._dl + z) + &
+                        q1*(z - log(1._dl + z)) + &
+                        q2*(0.5_dl*z**2 - z + &
+                            log(1._dl + z)) + &
+                        q3*(z**3/3._dl - &
+                            0.5_dl*z**2 + z - &
+                            log(1._dl + z))
+
+                    grho_de = grho_de_today * &
+                              exp(3._dl*Ipoly)
+
+                else
+
+                    ! Integral from z = 0 to z = zmax
+                    Imax = &
+                        q0*log(1._dl + this%bern_zmax) + &
+                        q1*(this%bern_zmax - &
+                            log(1._dl + this%bern_zmax)) + &
+                        q2*(0.5_dl*this%bern_zmax**2 - &
+                            this%bern_zmax + &
+                            log(1._dl + this%bern_zmax)) + &
+                        q3*(this%bern_zmax**3/3._dl - &
+                            0.5_dl*this%bern_zmax**2 + &
+                            this%bern_zmax - &
+                            log(1._dl + this%bern_zmax))
+
+
+                    ! High-z transition:
+                    !
+                    ! w = -1 + (A0 + A1*u)
+                    !          exp(-u^2/delta^2)
+
+                    A0 = 1._dl + this%bern_b3
+
+                    A1 = 3._dl * &
+                         (1._dl + this%bern_zmax) / &
+                         this%bern_zmax * &
+                         (this%bern_b3 - this%bern_b2)
+
+                    u = log((1._dl + z) / &
+                            (1._dl + this%bern_zmax))
+
+
+                    ! Analytic integral of the transition
+                    Itrans = &
+                        A0 * sqrt(acos(-1._dl)) * &
+                        this%bern_delta / 2._dl * &
+                        erf(u/this%bern_delta) + &
+                        A1 * this%bern_delta**2 / 2._dl * &
+                        (1._dl - &
+                         exp(-u**2/this%bern_delta**2))
+
+
+                    grho_de = grho_de_today * &
+                              exp(3._dl*(Imax + Itrans))
+
+                end if
+
             case default
                 stop "Invalid DEmodel"
         end select
@@ -343,6 +501,9 @@ module LateDE
             
             case(5)
                 stop "[TLateDE_Effective_w_wa] Effective (w,wa) not defined for Chebyshev w(z)"
+
+            case(6)
+                stop "[TLateDE_Effective_w_wa] Effective (w,wa) not defined for Bernstein w(z)"
         end select
     end subroutine TLateDE_Effective_w_wa
 

@@ -7,7 +7,7 @@ REIONIZATION_FILES ?= reionization
 RECOMBINATION_FILES ?= recfast
 NONLINEAR_FILES     ?= halofit SPkNonLinear SecondOrderPK ExternalNonLinearRatio
 # DARKENERGY_FILES  ?= DarkEnergyFluid DarkEnergyPPF PowellMinimize DarkEnergyQuintessence # DHFS: Original
-DARKENERGY_FILES  ?= LateDarkEnergy DarkEnergyPPF PowellMinimize  # DHFS: Mod
+DARKENERGY_FILES  ?= cubic_spline_w LateDarkEnergy DarkEnergyPPF PowellMinimize # DHFS: Mod
 
 BISPECTRUM ?= SeparableBispectrum
 

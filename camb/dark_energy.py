@@ -43,6 +43,9 @@ class LateDE(DarkEnergyModel):
         # Flexknots
         ("a_flexknot", AllocatableArrayDouble, "Flexknot scale-factor positions"),
         ("w_flexknot", AllocatableArrayDouble, "Flexknot equation-of-state values"),
+        # Cubic-spline
+        ("spline_z", AllocatableArrayDouble,"Fixed cubic-spline redshift nodes"),
+        ("spline_w", AllocatableArrayDouble,"Equation of state at cubic-spline nodes"),
         # Chebyshev
         ("cheb_c0", c_double, "Chebyshev C0"),
         ("cheb_c1", c_double, "Chebyshev C1"),
@@ -67,6 +70,8 @@ class LateDE(DarkEnergyModel):
                     w_knot=None,
                     a_flexknot=None,
                     w_flexknot=None,
+                    spline_z=None,
+                    spline_w=None,
                     cheb_c0=1.0,
                     cheb_c1=0.0,
                     cheb_c2=0.0,
@@ -160,6 +165,72 @@ class LateDE(DarkEnergyModel):
 
         elif DEmodel == 5:
 
+            if spline_z is None or spline_w is None:
+                raise ValueError(
+                    "DEmodel=5 requires spline_z and spline_w"
+                )
+
+            spline_z = np.asarray(
+                spline_z,
+                dtype=np.float64
+            )
+
+            spline_w = np.asarray(
+                spline_w,
+                dtype=np.float64
+            )
+
+            if spline_z.ndim != 1:
+                raise ValueError(
+                    "spline_z must be one-dimensional"
+                )
+
+            if spline_w.ndim != 1:
+                raise ValueError(
+                    "spline_w must be one-dimensional"
+                )
+
+            if len(spline_z) != len(spline_w):
+                raise ValueError(
+                    "spline_z and spline_w must have the same length"
+                )
+
+            if len(spline_z) < 3:
+                raise ValueError(
+                    "Cubic spline requires at least 3 nodes"
+                )
+
+            if not np.isclose(
+                    spline_z[0],
+                    0.0):
+                raise ValueError(
+                    "First cubic-spline node must be z=0"
+                )
+
+            if np.any(
+                    np.diff(spline_z) <= 0):
+                raise ValueError(
+                    "spline_z must be strictly increasing"
+                )
+
+            # High-z LambdaCDM boundary condition:
+            #
+            # w(zmax) = -1
+            if not np.isclose(
+                    spline_w[-1],
+                    -1.0,
+                    atol=1e-12,
+                    rtol=0):
+                raise ValueError(
+                    "For DEmodel=5, the last spline node must "
+                    "satisfy spline_w[-1] = -1 so that the "
+                    "cubic spline joins LambdaCDM at high redshift"
+                )
+
+            self.spline_z = spline_z
+            self.spline_w = spline_w
+
+        elif DEmodel == 6:
             if cheb_zmax <= 0:
                 raise ValueError(
                     "cheb_zmax must be positive"
@@ -177,7 +248,7 @@ class LateDE(DarkEnergyModel):
             self.cheb_zmax = cheb_zmax
             self.cheb_delta = cheb_delta
         
-        elif DEmodel == 6:
+        elif DEmodel == 7:
 
             if bern_zmax <= 0:
                 raise ValueError(

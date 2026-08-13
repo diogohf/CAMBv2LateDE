@@ -3,6 +3,9 @@ module LateDE
     use results
     use constants
     use classes
+    use CubicSplineW, only: &
+        SplineWValue, &
+        SplineWIntegral
     implicit none
 
     private
@@ -18,6 +21,10 @@ module LateDE
         ! Flexknots - Ormondroyd et al. 2025, arXiv:2503.08658
         real(dl), allocatable :: a_flexknot(:)
         real(dl), allocatable :: w_flexknot(:)
+        ! Cubic spline modfied to w(w) - Jiang et al. 2024, arXiv:2408.02365
+        real(dl), allocatable :: spline_z(:)
+        real(dl), allocatable :: spline_w(:)
+        real(dl) :: spline_delta = 1._dl
         ! Chebyshev - Calderon et al. 2024, arXiv:2405.04216v1
         real(dl) :: cheb_c0
         real(dl) :: cheb_c1
@@ -51,11 +58,15 @@ module LateDE
         class(TLateDE) :: this
         real(dl), intent(in) :: a    
         real(dl) :: w_de, z
+        ! Chebyshev / Bernstein
         real(dl) :: x
         real(dl) :: T0, T1, T2, T3
         real(dl) :: B0, B1, u
         real(dl) :: A0, A1
         integer :: i
+        ! Cubic spline
+        real(dl) :: zmax
+        integer :: n
 
         w_de = 0
         z = 1.0_dl/a - 1.0_dl
@@ -104,7 +115,27 @@ module LateDE
                     end do       
                 end if
 
+
             case(5)
+                ! Cubic spline w(z)
+            
+                n = size(this%spline_z)
+                zmax = this%spline_z(n)
+            
+                if (z <= zmax) then
+            
+                    w_de = SplineWValue( &
+                        z, &
+                        this%spline_z, &
+                        this%spline_w)
+            
+                else
+            
+                    w_de = -1._dl
+            
+                end if
+
+            case(6)
                 ! Chebyshev 
                 ! Calderon et al. 2024, arXiv:2405.04216v1
                 ! Eqs. (2.1), (2.2), (2.5)
@@ -135,7 +166,7 @@ module LateDE
                     w_de = -1._dl+(B0+B1*u)*exp(-u**2/this%cheb_delta**2)                    
                 endif
 
-            case(6)
+            case(7)
                 ! Bernstein polynomial
                 !
                 ! Cubic Bernstein representation:
@@ -208,6 +239,10 @@ module LateDE
         real(dl) :: Ipoly, Imax, Itrans
         real(dl) :: B0, B1, u
         real(dl) :: A0, A1
+        real(dl) :: A2
+        ! Cubic spline
+        real(dl) :: zmax, slope_max
+        integer :: n
 
         grho_de = 0
         z = 1.0_dl/a - 1.0_dl
@@ -277,6 +312,30 @@ module LateDE
                 end if    
 
             case(5)
+                ! Cubic spline 
+                n = size(this%spline_z)
+                zmax = this%spline_z(n)
+            
+                if (z <= zmax) then
+            
+                    Ipoly = SplineWIntegral( &
+                        z, &
+                        this%spline_z, &
+                        this%spline_w)
+            
+                else
+            
+                    Ipoly = SplineWIntegral( &
+                        zmax, &
+                        this%spline_z, &
+                        this%spline_w)
+            
+                end if
+            
+                grho_de = grho_de_today * &
+                          exp(3._dl*Ipoly)
+                
+            case(6)
                 ! Chebyshev
                 ! Calderon et al. 2024, arXiv:2405.04216v1
                 ! Eq. (2.4)
@@ -346,7 +405,7 @@ module LateDE
                         exp(3._dl*(Imax + Itrans))
                 endif    
 
-            case(6)
+            case(7)
                 ! Bernstein polynomial
                 !
                 ! w(z) =
@@ -500,9 +559,12 @@ module LateDE
                 stop "[TLateDE_Effective_w_wa] Effective (w,wa) not defined for flexknots"
             
             case(5)
-                stop "[TLateDE_Effective_w_wa] Effective (w,wa) not defined for Chebyshev w(z)"
+                stop "[TLateDE_Effective_w_wa] Effective (w,wa) not defined for cubic spline"
 
             case(6)
+                stop "[TLateDE_Effective_w_wa] Effective (w,wa) not defined for Chebyshev w(z)"
+
+            case(7)
                 stop "[TLateDE_Effective_w_wa] Effective (w,wa) not defined for Bernstein w(z)"
         end select
     end subroutine TLateDE_Effective_w_wa

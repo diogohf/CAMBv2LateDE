@@ -870,7 +870,10 @@ class CAMBparams(F2003Class):
         use_tabulated_w=False,
         wde_a_array=None,
         wde_w_array=None,
-        dark_energy_model="fluid",
+        # CAMB_LATEDE2 BEGINS
+        # dark_energy_model="fluid",
+        dark_energy_model="ppf",
+        # CAMB_LATEDE2 ENDS
     ):
         r"""
         Set dark energy parameters (use set_dark_energy_w_a to set w(a) from numerical table instead)

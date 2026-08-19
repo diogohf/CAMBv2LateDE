@@ -1,0 +1,673 @@
+## Run from cocoa/Cocoa (stable version v4.071)
+output: ../../coupled-quintessence/chains/test_gp
+
+stop_at_error: false
+debug: false
+timing: true
+
+theory:
+  camb:
+    path: ./external_modules/code/CAMBv2LateDE
+    use_renames: True
+    extra_args:
+      AccuracyBoost: 1.0
+      lens_potential_accuracy: 2
+      num_massive_neutrinos: 1
+      nnu: 3.046
+      dark_energy_model: ppf
+      DEmodel: 8
+      # Gaussian-process kernel:
+      #   1 = squared-exponential / RBF
+      #       K_ij = sigma_GP^2 exp[-0.5 (Delta z / ell_GP)^2]
+      #
+      #   2 = exponential / Holsclaw alpha=1
+      #       K_ij = sigma_GP^2 exp[-|Delta z| / ell_GP]
+      #
+      # Change only this flag to switch GP kernels.
+      gp_kernel: 1
+      gp_zmax: 3.5
+      accurate_massive_neutrino_transfers: false
+      k_per_logint: 10
+      kmax: 5
+
+likelihood:
+  ## CMB
+  planck_2018_highl_plik.TTTEEE:
+    path: ./external_modules
+  planck_2018_lowl.TT:
+    path: ./external_modules
+  planck_2018_lowl.EE:
+    path: ./external_modules  
+  ## Supernovae
+  sn.desy5:
+    path: ./external_modules/data/sn_data
+  ## BAO
+  bao.desi_dr2.desi_bao_all:
+    path: ./external_modules/data 
+  ## 3x2 pt  
+  des_y3.combo_3x2pt:
+    path: ./external_modules/data/des_y3
+    data_file: des_y3_real.dataset
+    accuracyboost: 1.0
+    integration_accuracy: 0
+    lmax: 50000 # lmax computed for real space correlation function
+    kmax_boltzmann: 5.0
+    # 1 EE2, 2 Halofit
+    non_linear_emul: 2
+    IA_model: 1
+    IA_redshift_evolution: 3
+    use_baryon_pca: False
+
+params:
+
+  # ----------------------------------------------------------
+  # Gaussian-process dark energy
+  # ----------------------------------------------------------
+
+  gp_sigma:
+    prior:
+      min: 0.01
+      max: 0.5
+    ref:
+      dist: norm
+      loc: 0.15
+      scale: 0.05
+    proposal: 0.03
+    latex: \sigma_{\rm GP}
+
+  gp_ell:
+    prior:
+      min: 0.1
+      max: 2.0
+    ref:
+      dist: norm
+      loc: 0.6
+      scale: 0.15
+    proposal: 0.1
+    latex: \ell_{\rm GP}
+
+
+  gp_q0:
+    prior:
+      dist: norm
+      loc: 0
+      scale: 1
+    ref:
+      dist: norm
+      loc: 0
+      scale: 1
+    proposal: 1
+    latex: q_0
+
+  gp_q1:
+    prior:
+      dist: norm
+      loc: 0
+      scale: 1
+    ref:
+      dist: norm
+      loc: 0
+      scale: 1
+    proposal: 1
+    latex: q_1
+
+  gp_q2:
+    prior:
+      dist: norm
+      loc: 0
+      scale: 1
+    ref:
+      dist: norm
+      loc: 0
+      scale: 1
+    proposal: 1
+    latex: q_2
+
+  gp_q3:
+    prior:
+      dist: norm
+      loc: 0
+      scale: 1
+    ref:
+      dist: norm
+      loc: 0
+      scale: 1
+    proposal: 1
+    latex: q_3
+
+  gp_q4:
+    prior:
+      dist: norm
+      loc: 0
+      scale: 1
+    ref:
+      dist: norm
+      loc: 0
+      scale: 1
+    proposal: 1
+    latex: q_4
+
+  gp_q5:
+    prior:
+      dist: norm
+      loc: 0
+      scale: 1
+    ref:
+      dist: norm
+      loc: 0
+      scale: 1
+    proposal: 1
+    latex: q_5
+
+  gp_q6:
+    prior:
+      dist: norm
+      loc: 0
+      scale: 1
+    ref:
+      dist: norm
+      loc: 0
+      scale: 1
+    proposal: 1
+    latex: q_6
+
+  gp_q7:
+    prior:
+      dist: norm
+      loc: 0
+      scale: 1
+    ref:
+      dist: norm
+      loc: 0
+      scale: 1
+    proposal: 1
+    latex: q_7
+
+  gp_q8:
+    prior:
+      dist: norm
+      loc: 0
+      scale: 1
+    ref:
+      dist: norm
+      loc: 0
+      scale: 1
+    proposal: 1
+    latex: q_8
+
+  gp_q9:
+    prior:
+      dist: norm
+      loc: 0
+      scale: 1
+    ref:
+      dist: norm
+      loc: 0
+      scale: 1
+    proposal: 1
+    latex: q_9
+
+  gp_q10:
+    prior:
+      dist: norm
+      loc: 0
+      scale: 1
+    ref:
+      dist: norm
+      loc: 0
+      scale: 1
+    proposal: 1
+    latex: q_{10}
+
+  gp_q11:
+    prior:
+      dist: norm
+      loc: 0
+      scale: 1
+    ref:
+      dist: norm
+      loc: 0
+      scale: 1
+    proposal: 1
+    latex: q_{11}
+
+  gp_q12:
+    prior:
+      dist: norm
+      loc: 0
+      scale: 1
+    ref:
+      dist: norm
+      loc: 0
+      scale: 1
+    proposal: 1
+    latex: q_{12}
+
+  gp_q13:
+    prior:
+      dist: norm
+      loc: 0
+      scale: 1
+    ref:
+      dist: norm
+      loc: 0
+      scale: 1
+    proposal: 1
+    latex: q_{13}
+
+  # COSMOLOGY HERE  
+  As_1e9:
+    prior:
+      min: 0.5
+      max: 5
+    ref:
+      dist: norm
+      loc: 2.1
+      scale: 0.65
+    proposal: 0.4
+    latex: 10^9 A_\mathrm{s}
+    drop: true
+    renames: A
+  ns:
+    prior:
+      min: 0.87
+      max: 1.07
+    ref:
+      dist: norm
+      loc: 0.96605
+      scale: 0.01
+    proposal: 0.01
+    latex: n_\mathrm{s}
+  H0:
+    prior:
+      min: 55
+      max: 91
+    ref:
+      dist: norm
+      loc: 67.32
+      scale: 5
+    proposal: 3
+    latex: H_0
+  omegab:
+    prior:
+      min: 0.03
+      max: 0.07
+    ref:
+      dist: norm
+      loc: 0.0495
+      scale: 0.004
+    proposal: 0.004
+    latex: \Omega_\mathrm{b}
+    drop: true
+  omegam:
+    prior:
+      min: 0.1
+      max: 0.9
+    ref:
+      dist: norm
+      loc: 0.316
+      scale: 0.02
+    proposal: 0.02
+    latex: \Omega_\mathrm{m}
+    drop: true
+  mnu: 
+    value: 0.06
+  tau:
+    value: 0.0697186
+    latex: \tau_\mathrm{reio}
+  # ----------------------------------------------------------------------------
+  # DES-Y3 3x2pt nuissance parameter begins
+  # ----------------------------------------------------------------------------
+  # ----------------------------------------------------------------------------
+  # DES-Y3 SOURCE VALUES FROM TABLE I, PAGE 11 of 2105.13549
+  # ----------------------------------------------------------------------------
+  DES_DZ_S1:
+    prior:
+      dist: norm
+      loc: 0.0
+      scale: 0.018
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.018
+    proposal: 0.005
+    latex: \Delta z_\mathrm{s,DES}^1
+  DES_DZ_S2:
+    prior:
+      dist: norm
+      loc: 0.0
+      scale: 0.015
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.015
+    proposal: 0.005
+    latex: \Delta z_\mathrm{s,DES}^2
+  DES_DZ_S3:
+    prior:
+      dist: norm
+      loc: 0.0
+      scale: 0.011
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.011
+    proposal: 0.005
+    latex: \Delta z_\mathrm{s,DES}^3
+  DES_DZ_S4:
+    prior:
+      dist: norm
+      loc: 0.0
+      scale: 0.017
+    ref:
+      dist: norm
+      loc: 0.0
+      scale: 0.017
+    proposal: 0.005
+    latex: \Delta z_\mathrm{s,DES}^4
+  DES_M1:
+    prior:
+      dist: norm
+      loc: -0.006
+      scale: 0.009
+    ref:
+      dist: norm
+      loc: -0.006
+      scale: 0.009
+    proposal: 0.004
+    latex: m_\mathrm{DES}^1
+  DES_M2:
+    prior:
+      dist: norm
+      loc: -0.02
+      scale: 0.008
+    ref:
+      dist: norm
+      loc: -0.02
+      scale: 0.008
+    proposal: 0.004
+    latex: m_\mathrm{DES}^2
+  DES_M3:
+    prior:
+      dist: norm
+      loc: -0.024
+      scale: 0.008
+    ref:
+      dist: norm
+      loc: -0.024
+      scale: 0.008
+    proposal: 0.004
+    latex: m_\mathrm{DES}^3
+  DES_M4:
+    prior:
+      dist: norm
+      loc: -0.037
+      scale: 0.008
+    ref:
+      dist: norm
+      loc: -0.037
+      scale: 0.008
+    proposal: 0.003
+    latex: m_\mathrm{DES}^4
+  DES_A1_1:
+    prior:
+      min: -5
+      max:  5
+    ref:
+      dist: norm
+      loc: 0.7
+      scale: 0.5
+    proposal: 0.5
+    latex: A_\mathrm{1-IA,DES}^1
+  DES_A1_2:
+    prior:
+      min: -5
+      max:  5
+    ref:
+      dist: norm
+      loc: -1.7
+      scale: 0.5
+    proposal: 0.5
+    latex: A_\mathrm{1-IA,DES}^2
+  DES_A2_1:
+    prior:
+      min: -5
+      max:  5
+    ref:
+      dist: norm
+      loc: -1.36
+      scale: 0.5
+    proposal: 0.5
+    latex: A_\mathrm{2-IA,DES}^1
+  DES_A2_2:
+    prior:
+      min: -5
+      max:  5
+    ref:
+      dist: norm
+      loc: -2.5
+      scale: 0.5
+    proposal: 0.5
+    latex: A_\mathrm{2-IA,DES}^2
+  DES_BTA_1:
+    prior:
+      min: 0
+      max: 2
+    ref:
+      dist: norm
+      loc: 1
+      scale: 0.15
+    proposal: 0.1
+  # ----------------------------------------------------------------------------
+  # DES-Y3 LENS VALUES FROM TABLE IV, PAGE 34 of 2105.13549
+  # ----------------------------------------------------------------------------
+  # Lensing photo-z errors
+  DES_DZ_L1:
+    prior:
+      dist: norm
+      loc: 0.006
+      scale: 0.004
+    ref:
+      dist: norm
+      loc: 0.006
+      scale: 0.004
+    proposal: 0.002
+    latex: \Delta z_\mathrm{l,DES}^1
+  DES_DZ_L2:
+    prior:
+      dist: norm
+      loc: 0.001
+      scale: 0.003
+    ref:
+      dist: norm
+      loc: 0.0001
+      scale: 0.003
+    proposal: 0.001
+    latex: \Delta z_\mathrm{l,DES}^2
+  DES_DZ_L3:
+    prior:
+      dist: norm
+      loc: 0.004
+      scale: 0.003
+    ref:
+      dist: norm
+      loc: 0.0004
+      scale: 0.003
+    proposal: 0.001
+    latex: \Delta z_\mathrm{l,DES}^3
+  DES_DZ_L4:
+    prior:
+      dist: norm
+      loc: -0.002
+      scale: 0.005
+    ref:
+      dist: norm
+      loc: -0.002
+      scale: 0.005
+    proposal: 0.002
+    latex: \Delta z_\mathrm{l,DES}^4
+  DES_DZ_L5:
+    prior:
+      dist: norm
+      loc: -0.007
+      scale: 0.01
+    ref:
+      dist: norm
+      loc: -0.007
+      scale: 0.01
+    proposal: 0.005
+    latex: \Delta z_\mathrm{l,DES}^5
+  # ----------------------------------------------------------------------------
+  # DES-Y3 LENS VALUES FROM TABLE IV, PAGE 34 of 2105.13549
+  # Table IV adopts Cosmolike convention BMAG_COSMOLIKE = 2 BMAG_COSMOSIS - 1
+  # ----------------------------------------------------------------------------
+  DES_BMAG_1:
+    value: 0.63
+    latex: b_\mathrm{BMAG-DES}^1
+  DES_BMAG_2:
+    value: -3.04
+    latex: b_\mathrm{BMAG-DES}^2
+  DES_BMAG_3:
+    value: -1.33
+    latex: b_\mathrm{BMAG-DES}^3
+  DES_BMAG_4:
+    value: 2.50
+    latex: b_\mathrm{BMAG-DES}^4
+  DES_BMAG_5:
+    value: 1.93
+    latex: b_\mathrm{BMAG-DES}^5
+  # ----------------------------------------------------------------------------
+  # POINT MASS MARGINALIZATION (not following DES paper here)
+  # ----------------------------------------------------------------------------
+  DES_PM1:
+    value: 0.0
+    latex: PM_\mathrm{DES}^1
+  DES_PM2:
+    value: 0.0
+    latex: PM_\mathrm{DES}^2
+  DES_PM3:
+    value: 0.0
+    latex: PM_\mathrm{DES}^3
+  DES_PM4:
+    value: 0.0
+    latex: PM_\mathrm{DES}^4
+  DES_PM5:
+    value: 0.0
+    latex: PM_\mathrm{DES}^5
+  # ---------------------------------------------------------------------------------------
+  # DES-Y3 3x2pt nuissance parameter End
+  # ---------------------------------------------------------------------------------------
+  # ----------------------------------------------------------------------------
+  # ---------------------------------------------------------------------------------------
+  # ------------------------------------- DERIVED PARAMETERS ------------------------------
+  # ---------------------------------------------------------------------------------------
+  # WARNING: DO NOT REMOVE omegabh2/omegach2/omegamh2/wa/As/ FROM DERIVED PARAMETERS
+  # WARNING: DO NOT REMOVE THE DROP FLAG FROM omegab/omegam/As_1e9/w0pwa
+  # SEE: github.com/CosmoLike/cocoa#warning-warning-warning-weak-lensing-yaml-files-in-cobaya-
+  # --------------------------------------------------------------------------------------- 
+  As:
+    value: 'lambda As_1e9: 1e-9 * As_1e9'
+    latex: A_\mathrm{s}
+  omegabh2:
+    value: 'lambda omegab, H0: omegab*(H0/100)**2'
+    latex: \Omega_\mathrm{b} h^2
+  omegach2:
+    value: 'lambda omegam, omegab, mnu, H0: (omegam-omegab)*(H0/100)**2-(mnu*(3.046/3)**0.75)/94.0708'
+    latex: \Omega_\mathrm{c} h^2
+  omegal:
+    latex: \Omega_\Lambda
+  omegamh2:
+    derived: 'lambda omegam, H0: omegam*(H0/100)**2'
+    latex: \Omega_\mathrm{m} h^2
+  sigma8:
+    latex: \sigma_8
+  s8h5:
+    derived: 'lambda sigma8, H0: sigma8*(H0*1e-2)**(-0.5)'
+    latex: \sigma_8/h^{0.5}
+  s8omegamp5:
+    derived: 'lambda sigma8, omegam: sigma8*omegam**0.5'
+    latex: \sigma_8 \Omega_\mathrm{m}^{0.5}
+  s8omegamp25:
+    derived: 'lambda sigma8, omegam: sigma8*omegam**0.25'
+    latex: \sigma_8 \Omega_\mathrm{m}^{0.25}
+  age:
+    latex: '{\rm{Age}}/\mathrm{Gyr}'
+  rdrag:
+    latex: r_\mathrm{drag}
+  yheused:
+    latex: Y_P^\mathrm{BBN}
+  omegan2:
+    latex: \Omega_\mathrm{\\nu} h^2
+  omegan:
+    derived: 'lambda omegan2, H0: omegan2/((H0/100)**2)'
+    latex: \Omega_\mathrm{\\nu}
+
+
+sampler:
+  mcmc:
+    covmat: './projects/des_y3/EXAMPLE_MCMC2.covmat'
+    covmat_params:
+    learn_proposal: True
+    learn_proposal_Rminus1_min: 0.035
+    learn_proposal_Rminus1_max: 300
+    learn_proposal_Rminus1_max_early: 1000.
+    max_samples: .inf
+    Rminus1_stop: 0.02
+    Rminus1_cl_stop: 0.2
+    Rminus1_cl_level: 0.95
+    measure_speeds: False
+    drag: False
+    oversample_power: 0.2
+    oversample_thin: True
+
+    blocking:
+      - [1,
+          [
+            beta_0, lamb, As_1e9, ns, H0, omegab, omegam
+          ]
+        ]
+
+      - [2,
+          [
+            DES_DZ_S1, DES_DZ_S2, DES_DZ_S3, DES_DZ_S4,
+            DES_A1_1, DES_A1_2, DES_A2_1, DES_A2_2, DES_BTA_1,
+            DES_B1_1, DES_B1_2, DES_B1_3, DES_B1_4, DES_B1_5,
+            DES_DZ_L1, DES_DZ_L2, DES_DZ_L3, DES_DZ_L4, DES_DZ_L5
+          ]
+        ]
+
+      - [20,
+          [
+            DES_M1, DES_M2, DES_M3, DES_M4
+          ]
+        ]
+
+      - [20,
+          [
+            A_planck,
+            calib_100T,
+            calib_217T,
+            A_cib_217,
+            xi_sz_cib,
+            A_sz,
+            ksz_norm,
+            gal545_A_100,
+            gal545_A_143,
+            gal545_A_143_217,
+            gal545_A_217,
+            ps_A_100_100,
+            ps_A_143_143,
+            ps_A_143_217,
+            ps_A_217_217,
+            galf_TE_A_100,
+            galf_TE_A_100_143,
+            galf_TE_A_100_217,
+            galf_TE_A_143,
+            galf_TE_A_143_217,
+            galf_TE_A_217
+          ]
+        ]
+
+    max_tries: 10000
+    burn_in: 0
+    Rminus1_single_split: 4
